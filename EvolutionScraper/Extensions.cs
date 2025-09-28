@@ -12,6 +12,15 @@ namespace EvolutionScraper
                 WaitUntil = [WaitUntilNavigation.Networkidle0],
                 Timeout = 30000
             });
+
+        public static DateTime GetNextDateTime(DayOfWeek targetDay, TimeOnly time)
+        {
+            DateTime today = DateTime.Today;
+            int daysUntilTarget = ((int)targetDay - (int)today.DayOfWeek + 7) % 7;
+            DateTime targetDate = today.AddDays(daysUntilTarget);
+
+            return targetDate.Add(time.ToTimeSpan());
+        }
     }
 
     internal sealed class DateTimeConverter : JsonConverter<DateTime>

@@ -89,12 +89,36 @@ namespace EvolutionScraper
             return items.ToArray();
         }
 
-        internal async Task<ClassScheduleItem[]> GetClassSchedulesAsync()
+        internal async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
         {
+            DateTime date = Extensions.GetNextDateTime(day, time);
+
             await RunBrowserAsync().ConfigureAwait(false);
             await LoginAsync().ConfigureAwait(false);
             await FindClassesPageAsync().ConfigureAwait(false);
-            return await ScrapeClassSchedulesAsync().ConfigureAwait(false);
+
+            ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
+
+            ClassScheduleItem? classToBook =
+                items
+                    .FirstOrDefault(x => x.ClassName.ToLowerInvariant() == className.ToLowerInvariant()
+                        && x.Date == date);
+
+            if (classToBook is null)
+            {
+                return false;
+            }
+
+            await _page.ClickAsync($"input[name=\"{classToBook.Button}\"]").ConfigureAwait(false);
+            await _page.WaitAsync().ConfigureAwait(false);
+            await _page.ClickAsync($"#SubmitEnroll2").ConfigureAwait(false);
+            await _page.WaitAsync().ConfigureAwait(false);
+
+            bool isBooked = await _page.EvaluateExpressionAsync<bool>(
+                "document.querySelector('#notifyBooking') !== null")
+                .ConfigureAwait(false);
+
+            return isBooked;
         }
     }
 }

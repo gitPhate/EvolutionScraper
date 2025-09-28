@@ -7,5 +7,5 @@ EvolutionScraperOptions opt =
     ?? throw new JsonException("Unable to deserialize options");
 
 EvolutionScraper.EvolutionScraper scraper = new(opt);
-ClassScheduleItem[] items = await scraper.GetClassSchedulesAsync();
-bool a = true;
+bool isBooked = await scraper.BookClassAsync("Pilates", DayOfWeek.Monday, new TimeOnly(8, 30));
+Console.ReadLine();
