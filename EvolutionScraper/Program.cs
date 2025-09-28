@@ -1,9 +1,11 @@
-﻿using EvolutionAutomation;
-using PuppeteerSharp;
+﻿
+using EvolutionScraper;
 using System.Text.Json;
 
 EvolutionScraperOptions opt =
     JsonSerializer.Deserialize<EvolutionScraperOptions>(File.ReadAllText(@"appsettings.json"))
     ?? throw new JsonException("Unable to deserialize options");
-EvolutionScraper scraper = new(opt);
-IPage page = await scraper.GetMainPageAsync();
+
+EvolutionScraper.EvolutionScraper scraper = new(opt);
+ClassScheduleItem[] items = await scraper.GetClassSchedulesAsync();
+bool a = true;

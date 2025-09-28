@@ -64,7 +64,8 @@
     }
 
     return Array
-        .from(document.getElementsByClassName("modalClassDesc")).filter(x => x.textContent.includes("Calisthenics")).map(x => {
+        .from(document.getElementsByClassName("modalClassDesc"))
+        .map(x => {
             const parentRow = x?.parentElement?.parentElement?.parentElement;
 
             // Extract structured data from known positions
@@ -88,7 +89,5 @@
                 date: parseItalianDateTime(date, time).toISOString()
             };
 
-        })
-        .filter(c => c.button != null)
-        .sort((a, b) => a.date - b.date);
+        });
 }

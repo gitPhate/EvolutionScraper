@@ -1,49 +1,64 @@
 ﻿using PuppeteerSharp;
 using PuppeteerSharp.Input;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
-namespace EvolutionAutomation
+namespace EvolutionScraper
 {
-    public record EvolutionScraperOptions(string ChromePath, string Username, string Password);
+    public record EvolutionScraperOptions(string ChromePath, string Username, string Password)
+    {
+        public EvolutionScraperOptions() : this(string.Empty, string.Empty, string.Empty)
+        {
+        }
+    }
 
     internal class EvolutionScraper(EvolutionScraperOptions options)
     {
-        internal async Task<IPage> GetMainPageAsync()
+        private readonly EvolutionScraperOptions _options = options;
+        private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
+
+        private IBrowser _browser = null!;
+        private IPage _page = null!;
+
+        private async Task RunBrowserAsync()
         {
             // Download and initialize browser
             LaunchOptions launchOptions = new()
             {
                 Headless = true,
                 Args = ["--no-sandbox", "--disable-setuid-sandbox"],
-                ExecutablePath = options.ChromePath
+                ExecutablePath = _options.ChromePath
             };
 
-            using IBrowser browser = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
-            using IPage page = await browser.NewPageAsync().ConfigureAwait(false);
+            _browser = await Puppeteer.LaunchAsync(launchOptions).ConfigureAwait(false);
+            _page = await _browser.NewPageAsync().ConfigureAwait(false);
 
+            _jsonOptions.Converters.Add(new DateTimeConverter());
+        }
+
+        private async Task LoginAsync()
+        {
             // Set a realistic user agent
-            await page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").ConfigureAwait(false);
+            await _page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").ConfigureAwait(false);
 
             // Navigate to login page
-            await page.GoToAsync("https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date=9%2f28%2f2025&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
+            await _page.GoToAsync("https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date=9%2f28%2f2025&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
                 new NavigationOptions { WaitUntil = [WaitUntilNavigation.Networkidle0] })
                 .ConfigureAwait(false);
 
             // Wait for login form to load
-            await page.WaitForSelectorAsync("#su1UserName").ConfigureAwait(false);
-            await page.WaitForSelectorAsync("#su1Password").ConfigureAwait(false);
+            await _page.WaitForSelectorAsync("#su1UserName").ConfigureAwait(false);
+            await _page.WaitForSelectorAsync("#su1Password").ConfigureAwait(false);
 
             // Fill credentials
-            await page.TypeAsync("#su1UserName", options.Username, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
-            await page.TypeAsync("#su1Password", options.Password, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
+            await _page.TypeAsync("#su1UserName", _options.Username, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
+            await _page.TypeAsync("#su1Password", _options.Password, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
 
             // Submit form and wait for navigation
-            await page.ClickAsync("#btnSu1Login").ConfigureAwait(false);
-            await page.WaitAsync().ConfigureAwait(false);
+            await _page.ClickAsync("#btnSu1Login").ConfigureAwait(false);
+            await _page.WaitAsync().ConfigureAwait(false);
 
             // Verify successful login
-            bool isLoggedIn = await page.EvaluateExpressionAsync<bool>(
+            bool isLoggedIn = await _page.EvaluateExpressionAsync<bool>(
                 "document.querySelector('#myInfoContainer') !== null")
                 .ConfigureAwait(false);
 
@@ -51,61 +66,35 @@ namespace EvolutionAutomation
             {
                 throw new InvalidOperationException("Unable to login");
             }
+        }
 
-            await page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
-            await page.WaitAsync().ConfigureAwait(false);
+        private async Task FindClassesPageAsync()
+        {
+            await _page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
+            await _page.WaitAsync().ConfigureAwait(false);
 
             if (DateTime.Today.DayOfWeek == DayOfWeek.Saturday
                 || DateTime.Today.DayOfWeek == DayOfWeek.Sunday)
             {
-                await page.ClickAsync("#day-arrow-r").ConfigureAwait(false);
-                await page.WaitAsync().ConfigureAwait(false);
+                await _page.ClickAsync("#day-arrow-r").ConfigureAwait(false);
+                await _page.WaitAsync().ConfigureAwait(false);
             }
-
-            string script = File.ReadAllText("class_selector.js");
-
-            JsonSerializerOptions opt = new(JsonSerializerDefaults.Web);
-            opt.Converters.Add(new DateTimeConverter());
-
-            JsonDocument o = await page.EvaluateFunctionAsync<JsonDocument>(script).ConfigureAwait(false);
-            List<ClassScheduleItem> items = JsonSerializer.Deserialize<List<ClassScheduleItem>>(o.RootElement.GetRawText(), opt) ?? [];
-
-            return page;
         }
-    }
 
-    internal static class Ext
-    {
-        public static Task WaitAsync(this IPage page) =>
-            page.WaitForNavigationAsync(new NavigationOptions
-            {
-                WaitUntil = [WaitUntilNavigation.Networkidle0],
-                Timeout = 30000
-            });
-    }
-
-
-    public class ClassScheduleItem
-    {
-        public string ClassName { get; set; }
-        public string Instructor { get; set; }
-        public string Room { get; set; }
-        public string Duration { get; set; }
-        public string Availability { get; set; }
-        public DateTime Date { get; set; }
-    }
-
-    sealed class DateTimeConverter : JsonConverter<DateTime>
-    {
-        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        private async Task<ClassScheduleItem[]> ScrapeClassSchedulesAsync()
         {
-            string isoDate = reader.GetString()!;
-
-            DateTimeOffset dto = DateTimeOffset.Parse(isoDate);
-            return dto.LocalDateTime;
+            string script = File.ReadAllText("class_selector.js");
+            JsonDocument o = await _page.EvaluateFunctionAsync<JsonDocument>(script).ConfigureAwait(false);
+            List<ClassScheduleItem> items = JsonSerializer.Deserialize<List<ClassScheduleItem>>(o.RootElement.GetRawText(), _jsonOptions) ?? [];
+            return items.ToArray();
         }
 
-        public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options) =>
-            value.ToString("o");
+        internal async Task<ClassScheduleItem[]> GetClassSchedulesAsync()
+        {
+            await RunBrowserAsync().ConfigureAwait(false);
+            await LoginAsync().ConfigureAwait(false);
+            await FindClassesPageAsync().ConfigureAwait(false);
+            return await ScrapeClassSchedulesAsync().ConfigureAwait(false);
+        }
     }
 }
