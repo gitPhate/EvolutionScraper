@@ -91,6 +91,19 @@ namespace EvolutionScraper
 
         internal async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
         {
+            try
+            {
+                return await BookClassCoreAsync(className, day, time).ConfigureAwait(false);
+            }
+            finally
+            {
+                await _page.CloseAsync().ConfigureAwait(false);
+                await _browser.CloseAsync().ConfigureAwait(false);
+            }
+        }
+
+        private async Task<bool> BookClassCoreAsync(string className, DayOfWeek day, TimeOnly time)
+        {
             DateTime date = Extensions.GetNextDateTime(day, time);
 
             await RunBrowserAsync().ConfigureAwait(false);
