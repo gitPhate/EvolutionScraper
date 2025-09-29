@@ -1,39 +1,52 @@
 ﻿
 using EvolutionScraper;
+using Microsoft.Extensions.Logging;
+using NLog;
+using NLog.Extensions.Logging;
 
-Console.WriteLine("Evolution scraper v1.0");
-
-Console.WriteLine("Reading configs");
-
-Settings settings = Settings.NewFromFile();
-bool somethingFound = false;
-
-foreach (var kvp in settings.Bookings)
+Logger logger = LogManager.GetCurrentClassLogger();
+try
 {
-    DayOfWeek triggerDay = (DayOfWeek)((int)(kvp.Key - 3 + 7) % 7);
-    if (DateTime.Now.DayOfWeek != triggerDay)
+    logger.Info("Evolution scraper v1.0");
+
+    logger.Info("Reading configs");
+
+    Settings settings = Settings.NewFromFile();
+    bool somethingFound = false;
+
+    foreach (var kvp in settings.Bookings)
     {
-        continue;
+        DayOfWeek triggerDay = (DayOfWeek)((int)(kvp.Key - 3 + 7) % 7);
+        if (DateTime.Now.DayOfWeek != triggerDay)
+        {
+            continue;
+        }
+
+        somethingFound = true;
+        logger.Info($"Time to book: {kvp.Value.Name} scheduled for {kvp.Key} at {kvp.Value.Time}");
+
+        using ILoggerFactory loggerFactory = new NLogLoggerFactory();
+        using EvolutionScraper.EvolutionScraper scraper = new(settings.EvolutionScraperOptions, loggerFactory.CreateLogger<EvolutionScraper.EvolutionScraper>());
+
+        logger.Info("Booking #1 class");
+        bool isBooked = await scraper.BookClassAsync(kvp.Value.Name, kvp.Key, kvp.Value.Time);
+        if (isBooked)
+        {
+            logger.Info("Booked successfully");
+        }
+        else
+        {
+            logger.Info("Something went wrong with booking");
+        }
     }
 
-    somethingFound = true;
-    Console.WriteLine($"Time to book: {kvp.Value.Name} scheduled for {kvp.Key} at {kvp.Value.Time}");
-    using EvolutionScraper.EvolutionScraper scraper = new(settings.EvolutionScraperOptions);
-
-    Console.WriteLine("Booking #1 class");
-    bool isBooked = await scraper.BookClassAsync(kvp.Value.Name, kvp.Key, kvp.Value.Time);
-    if (isBooked)
+    if (!somethingFound)
     {
-        Console.WriteLine("Booked successfully");
-    }
-    else
-    {
-        Console.WriteLine("Something went wrong with booking");
+        logger.Info("Nothing to book found");
     }
 }
-
-if (!somethingFound)
+finally
 {
-    Console.WriteLine("Nothing to book found");
+    LogManager.Shutdown();
 }
 

@@ -1,4 +1,5 @@
-﻿using PuppeteerSharp;
+﻿using Microsoft.Extensions.Logging;
+using PuppeteerSharp;
 using PuppeteerSharp.Input;
 using System.Text.Json;
 
@@ -11,7 +12,7 @@ namespace EvolutionScraper
         }
     }
 
-    internal class EvolutionScraper(EvolutionScraperOptions options) : IDisposable
+    internal class EvolutionScraper(EvolutionScraperOptions options, ILogger<EvolutionScraper> logger) : IDisposable
     {
         private readonly EvolutionScraperOptions _options = options;
         private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -91,7 +92,7 @@ namespace EvolutionScraper
             }
         }
 
-        private static async ValueTask WaitUntilDueHourAsync(int hour, int maxMinutesToWait)
+        private async ValueTask WaitUntilDueHourAsync(int hour, int maxMinutesToWait)
         {
             if (DateTime.Now.Hour != hour - 1
                 || (60 - DateTime.Now.Minute > maxMinutesToWait))
@@ -101,7 +102,7 @@ namespace EvolutionScraper
 
             while (DateTime.Now.Hour != hour)
             {
-                Console.WriteLine($"Waiting for the right time ({DateTime.Now})");
+                logger.LogInformation($"Waiting for the right time ({DateTime.Now})");
                 await Task.Delay(1000).ConfigureAwait(false);
             }
         }
@@ -140,7 +141,7 @@ namespace EvolutionScraper
             }
             catch (NotSupportedException ex)
             {
-                Console.WriteLine(ex.Message);
+                logger.LogInformation(ex.Message);
                 return false;
             }
 
