@@ -11,7 +11,7 @@ namespace EvolutionScraper
         }
     }
 
-    internal class EvolutionScraper(EvolutionScraperOptions options)
+    internal class EvolutionScraper(EvolutionScraperOptions options) : IDisposable
     {
         private readonly EvolutionScraperOptions _options = options;
         private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -119,6 +119,12 @@ namespace EvolutionScraper
                 .ConfigureAwait(false);
 
             return isBooked;
+        }
+
+        public void Dispose()
+        {
+            _page.Dispose();
+            _browser.Dispose();
         }
     }
 }
