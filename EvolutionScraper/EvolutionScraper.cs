@@ -70,14 +70,39 @@ namespace EvolutionScraper
 
         private async Task FindClassesPageAsync()
         {
+            bool isWeekend =
+                DateTime.Today.DayOfWeek == DayOfWeek.Saturday
+                || DateTime.Today.DayOfWeek == DayOfWeek.Sunday;
+
+            if (!isWeekend)
+            {
+                await WaitUntilDueHourAsync(9, 2).ConfigureAwait(false);
+            }
+
             await _page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
             await _page.WaitAsync().ConfigureAwait(false);
 
-            if (DateTime.Today.DayOfWeek == DayOfWeek.Saturday
-                || DateTime.Today.DayOfWeek == DayOfWeek.Sunday)
+            if (isWeekend)
             {
+                await WaitUntilDueHourAsync(9, 2).ConfigureAwait(false);
+
                 await _page.ClickAsync("#day-arrow-r").ConfigureAwait(false);
                 await _page.WaitAsync().ConfigureAwait(false);
+            }
+        }
+
+        private static async ValueTask WaitUntilDueHourAsync(int hour, int maxMinutesToWait)
+        {
+            if (DateTime.Now.Hour != hour - 1
+                || (60 - DateTime.Now.Minute > maxMinutesToWait))
+            {
+                throw new NotSupportedException($"Current time is past or too far from the due hour ({DateTime.Now})");
+            }
+
+            while (DateTime.Now.Hour != hour)
+            {
+                Console.WriteLine($"Waiting for the right time ({DateTime.Now})");
+                await Task.Delay(1000).ConfigureAwait(false);
             }
         }
 
@@ -108,7 +133,16 @@ namespace EvolutionScraper
 
             await RunBrowserAsync().ConfigureAwait(false);
             await LoginAsync().ConfigureAwait(false);
-            await FindClassesPageAsync().ConfigureAwait(false);
+
+            try
+            {
+                await FindClassesPageAsync().ConfigureAwait(false);
+            }
+            catch (NotSupportedException ex)
+            {
+                Console.WriteLine(ex.Message);
+                return false;
+            }
 
             ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
 
