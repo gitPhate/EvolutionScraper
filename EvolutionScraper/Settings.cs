@@ -15,7 +15,7 @@ namespace EvolutionScraper
         public EvolutionScraperOptions EvolutionScraperOptions { get; set; }
 
         [JsonRequired]
-        public Dictionary<DayOfWeek, ClassBooking> Bookings { get; set; }
+        public Dictionary<DayOfWeek, ClassBooking[]> Bookings { get; set; }
 
         public static Settings NewFromFile(string filePath = null)
         {
