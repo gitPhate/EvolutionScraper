@@ -3,11 +3,12 @@ using EvolutionScraper;
 using Microsoft.Extensions.Logging;
 using NLog;
 using NLog.Extensions.Logging;
+using System.Reflection;
 
 Logger logger = LogManager.GetCurrentClassLogger();
 try
 {
-    logger.Info("Evolution scraper v1.0");
+    logger.Info($"Evolution scraper v{GetVersion()}");
 
     logger.Info("Reading configs");
 
@@ -60,3 +61,13 @@ finally
     LogManager.Shutdown();
 }
 
+static string GetVersion()
+{
+    Version? version = Assembly.GetExecutingAssembly().GetName().Version;
+    if (version is null)
+    {
+        return string.Empty;
+    }
+
+    return $"{version.Major}.{version.Minor}.{version.Build}";
+}
