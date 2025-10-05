@@ -171,8 +171,8 @@ namespace EvolutionScraper
 
         public void Dispose()
         {
-            _page.Dispose();
-            _browser.Dispose();
+            _page?.Dispose();
+            _browser?.Dispose();
         }
     }
 }
