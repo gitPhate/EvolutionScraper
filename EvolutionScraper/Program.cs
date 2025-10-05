@@ -45,6 +45,10 @@ try
         logger.Info("Nothing to book found");
     }
 }
+catch (Exception ex)
+{
+    logger.Error("An error occurred", ex);
+}
 finally
 {
     LogManager.Shutdown();
