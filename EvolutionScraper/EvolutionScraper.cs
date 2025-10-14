@@ -12,7 +12,7 @@ namespace EvolutionScraper
         }
     }
 
-    internal class EvolutionScraper(EvolutionScraperOptions options, ILogger<EvolutionScraper> logger) : IDisposable
+    public sealed class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable
     {
         private readonly EvolutionScraperOptions _options = options;
         private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
@@ -115,7 +115,7 @@ namespace EvolutionScraper
             return items.ToArray();
         }
 
-        internal async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
+        public async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
         {
             try
             {
@@ -141,7 +141,7 @@ namespace EvolutionScraper
             }
             catch (NotSupportedException ex)
             {
-                logger.LogInformation(ex.Message);
+                logger.LogError(ex.Message);
                 return false;
             }
 
@@ -154,6 +154,7 @@ namespace EvolutionScraper
 
             if (classToBook is null)
             {
+                logger.LogError("No classes found");
                 return false;
             }
 

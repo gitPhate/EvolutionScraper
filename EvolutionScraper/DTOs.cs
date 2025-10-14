@@ -11,4 +11,10 @@
         public string Button { get; set; }
         public DateTime Date { get; set; }
     }
+
+    public struct ClassBooking
+    {
+        public string Name { get; set; }
+        public TimeOnly Time { get; set; }
+    }
 }
