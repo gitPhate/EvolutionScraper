@@ -8,9 +8,12 @@ using NLog.Extensions.Hosting;
 using Quartz;
 using System.Reflection;
 
+Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+
 await Host
     .CreateDefaultBuilder(args)
     .UseWindowsService()
+    .UseContentRoot(AppContext.BaseDirectory)
     .ConfigureServices
     (
         (hostContext, services) =>
