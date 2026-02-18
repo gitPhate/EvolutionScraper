@@ -78,7 +78,7 @@ namespace EvolutionScraper
 
             if (!isWeekend)
             {
-                await WaitUntilDueHourAsync(9, 2).ConfigureAwait(false);
+                await WaitUntilDueTimeAsync(9, 5, 60).ConfigureAwait(false);
             }
 
             await _page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
@@ -86,14 +86,14 @@ namespace EvolutionScraper
 
             if (isWeekend)
             {
-                await WaitUntilDueHourAsync(9, 2).ConfigureAwait(false);
+                await WaitUntilDueTimeAsync(9, 5, 60).ConfigureAwait(false);
 
                 await _page.ClickAsync("#day-arrow-r").ConfigureAwait(false);
                 await _page.WaitAsync().ConfigureAwait(false);
             }
         }
 
-        private async ValueTask WaitUntilDueHourAsync(int hour, int maxMinutesToWait)
+        private async ValueTask WaitUntilDueTimeAsync(short hour, short maxMinutesToWait, short secondsToWaitAfterDueTime)
         {
             if (DateTime.Now.Hour != hour - 1
                 || (60 - DateTime.Now.Minute > maxMinutesToWait))
@@ -105,6 +105,12 @@ namespace EvolutionScraper
             {
                 logger.LogInformation($"Waiting for the right time ({DateTime.Now})");
                 await Task.Delay(1000).ConfigureAwait(false);
+            }
+
+            while(DateTime.Now.Second < secondsToWaitAfterDueTime)
+            {
+                logger.LogInformation($"Waiting for the right time ({DateTime.Now})");
+                await Task.Delay(500).ConfigureAwait(false);
             }
         }
 
