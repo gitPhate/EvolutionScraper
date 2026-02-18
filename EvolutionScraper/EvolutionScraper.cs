@@ -41,8 +41,9 @@ namespace EvolutionScraper
             // Set a realistic user agent
             await _page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").ConfigureAwait(false);
 
+            string currentUrlDate = DateTime.Today.ToString("M/d/yyyy").Replace("/", "%2f");
             // Navigate to login page
-            await _page.GoToAsync("https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date=9%2f28%2f2025&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
+            await _page.GoToAsync($"https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date={currentUrlDate}&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
                 new NavigationOptions { WaitUntil = [WaitUntilNavigation.Networkidle0] })
                 .ConfigureAwait(false);
 
