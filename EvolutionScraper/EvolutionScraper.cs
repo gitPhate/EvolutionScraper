@@ -66,7 +66,7 @@ namespace EvolutionScraper
 
             if (!isLoggedIn)
             {
-                throw new InvalidOperationException("Unable to login");
+                await ThrowLoggingPageAsync(new InvalidOperationException("Unable to login")).ConfigureAwait(false);
             }
         }
 
@@ -135,16 +135,7 @@ namespace EvolutionScraper
 
             await RunBrowserAsync().ConfigureAwait(false);
             await LoginAsync().ConfigureAwait(false);
-
-            try
-            {
-                await FindClassesPageAsync().ConfigureAwait(false);
-            }
-            catch (NotSupportedException ex)
-            {
-                logger.LogError(ex.Message);
-                return false;
-            }
+            await FindClassesPageAsync().ConfigureAwait(false);
 
             ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
 
@@ -155,7 +146,13 @@ namespace EvolutionScraper
 
             if (classToBook is null)
             {
-                logger.LogError("No classes found");
+                logger.LogDebug("All classes scraped:");
+                foreach (ClassScheduleItem item in items)
+                {
+                    logger.LogDebug(JsonSerializer.Serialize(item, _jsonOptions));
+                }
+
+                await ThrowLoggingPageAsync(new InvalidOperationException("Unable to find any class to book")).ConfigureAwait(false);
                 return false;
             }
 
@@ -169,6 +166,13 @@ namespace EvolutionScraper
                 .ConfigureAwait(false);
 
             return isBooked;
+        }
+
+        private async Task ThrowLoggingPageAsync(Exception ex)
+        {
+            string content = await _page.GetContentAsync().ConfigureAwait(false);
+            await File.WriteAllTextAsync($"page_dump_{DateTime.Now:yyyyMMddHHmmss}.html", content).ConfigureAwait(false);
+            throw ex;
         }
 
         public void Dispose()
