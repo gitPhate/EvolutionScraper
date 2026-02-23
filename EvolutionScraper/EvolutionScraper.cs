@@ -26,7 +26,17 @@ namespace EvolutionScraper
             LaunchOptions launchOptions = new()
             {
                 Headless = true,
-                Args = ["--no-sandbox", "--disable-setuid-sandbox"],
+                Args = [
+                    "--disable-blink-features=AutomationControlled",
+                    "--disable-dev-shm-usage",
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-infobars",
+                    "--window-size=1920,1080",
+                    "--start-maximized",
+                    "--disable-extensions",
+                ],
+                IgnoredDefaultArgs = ["--enable-automation"],
                 ExecutablePath = _options.ChromePath
             };
 
@@ -38,13 +48,42 @@ namespace EvolutionScraper
 
         private async Task LoginAsync()
         {
+            await _page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 }).ConfigureAwait(false);
+
+            await _page.EvaluateExpressionOnNewDocumentAsync(@"
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    window.chrome = { runtime: {} };
+    Object.defineProperty(navigator, 'permissions', {
+        query: (parameters) => (
+            parameters.name === 'notifications'
+                ? Promise.resolve({ state: Notification.permission })
+                : navigator.permissions.query(parameters)
+        )
+    });
+").ConfigureAwait(false);
+
             // Set a realistic user agent
-            await _page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36").ConfigureAwait(false);
+            await _page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36").ConfigureAwait(false);
+
+            await _page.SetExtraHttpHeadersAsync(new Dictionary<string, string>
+            {
+                ["accept-language"] = "en-US,en;q=0.9",
+                ["accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                ["sec-ch-ua"] = "\"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"",
+                ["sec-ch-ua-mobile"] = "?0",
+                ["sec-ch-ua-platform"] = "\"Windows\"",
+                ["upgrade-insecure-requests"] = "1"
+            })
+            .ConfigureAwait(false);
+
+            //Restore cookies
 
             string currentUrlDate = DateTime.Today.ToString("M/d/yyyy").Replace("/", "%2f");
             // Navigate to login page
             await _page.GoToAsync($"https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date={currentUrlDate}&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
-                new NavigationOptions { WaitUntil = [WaitUntilNavigation.Networkidle0] })
+                new NavigationOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] })
                 .ConfigureAwait(false);
 
             // Wait for login form to load
@@ -107,11 +146,7 @@ namespace EvolutionScraper
                 await Task.Delay(1000).ConfigureAwait(false);
             }
 
-            while(DateTime.Now.Second < secondsToWaitAfterDueTime)
-            {
-                logger.LogInformation($"Waiting for the right time ({DateTime.Now})");
-                await Task.Delay(500).ConfigureAwait(false);
-            }
+            await Task.Delay(secondsToWaitAfterDueTime * 1000).ConfigureAwait(false);
         }
 
         private async Task<ClassScheduleItem[]> ScrapeClassSchedulesAsync()
