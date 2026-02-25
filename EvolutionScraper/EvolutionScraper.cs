@@ -12,13 +12,13 @@ namespace EvolutionScraper
         }
     }
 
-    public sealed class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable
+    public sealed class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable, IAsyncDisposable
     {
         private readonly EvolutionScraperOptions _options = options;
         private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
-        private IBrowser _browser = null!;
-        private IPage _page = null!;
+        private IBrowser? _browser = null!;
+        private IPage? _page = null!;
 
         private async Task RunBrowserAsync()
         {
@@ -48,6 +48,11 @@ namespace EvolutionScraper
 
         private async Task LoginAsync()
         {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
             await _page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 }).ConfigureAwait(false);
 
             await _page.EvaluateExpressionOnNewDocumentAsync(@"
@@ -111,6 +116,11 @@ namespace EvolutionScraper
 
         private async Task FindClassesPageAsync()
         {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
             bool isWeekend =
                 DateTime.Today.DayOfWeek == DayOfWeek.Saturday
                 || DateTime.Today.DayOfWeek == DayOfWeek.Sunday;
@@ -151,6 +161,11 @@ namespace EvolutionScraper
 
         private async Task<ClassScheduleItem[]> ScrapeClassSchedulesAsync()
         {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
             string script = File.ReadAllText("class_selector.js");
             JsonDocument o = await _page.EvaluateFunctionAsync<JsonDocument>(script).ConfigureAwait(false);
             List<ClassScheduleItem> items = JsonSerializer.Deserialize<List<ClassScheduleItem>>(o.RootElement.GetRawText(), _jsonOptions) ?? [];
@@ -159,22 +174,13 @@ namespace EvolutionScraper
 
         public async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
         {
-            try
-            {
-                return await BookClassCoreAsync(className, day, time).ConfigureAwait(false);
-            }
-            finally
-            {
-                await _page.CloseAsync().ConfigureAwait(false);
-                await _browser.CloseAsync().ConfigureAwait(false);
-            }
-        }
-
-        private async Task<bool> BookClassCoreAsync(string className, DayOfWeek day, TimeOnly time)
-        {
-            DateTime date = Extensions.GetNextDateTime(day, time);
-
             await RunBrowserAsync().ConfigureAwait(false);
+
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
             await LoginAsync().ConfigureAwait(false);
             await FindClassesPageAsync().ConfigureAwait(false);
 
@@ -183,7 +189,7 @@ namespace EvolutionScraper
             ClassScheduleItem? classToBook =
                 items
                     .FirstOrDefault(x => x.ClassName.ToLowerInvariant() == className.ToLowerInvariant()
-                        && x.Date == date);
+                        && x.Date == Extensions.GetNextDateTime(day, time));
 
             if (classToBook is null)
             {
@@ -211,6 +217,11 @@ namespace EvolutionScraper
 
         private async Task ThrowLoggingPageAsync(Exception ex)
         {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
             string content = await _page.GetContentAsync().ConfigureAwait(false);
             await File.WriteAllTextAsync($"page_dump_{DateTime.Now:yyyyMMddHHmmss}.html", content).ConfigureAwait(false);
             throw ex;
@@ -218,8 +229,48 @@ namespace EvolutionScraper
 
         public void Dispose()
         {
-            _page?.Dispose();
-            _browser?.Dispose();
+            if (_page is not null)
+            {
+                if (!_page.IsClosed)
+                {
+                    _page.CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+                }
+
+                _page.Dispose();
+            }
+
+            if (_browser is not null)
+            {
+                if (!_browser.IsClosed)
+                {
+                    _browser.CloseAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+                }
+
+                _browser.Dispose();
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (_page is not null)
+            {
+                if (!_page.IsClosed)
+                {
+                    await _page.CloseAsync().ConfigureAwait(false);
+                }
+
+                await _page.DisposeAsync().ConfigureAwait(false);
+            }
+
+            if (_browser is not null)
+            {
+                if (!_browser.IsClosed)
+                {
+                    await _browser.CloseAsync().ConfigureAwait(false);
+                }
+
+                await _browser.DisposeAsync().ConfigureAwait(false);
+            }
         }
     }
 }
