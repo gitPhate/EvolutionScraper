@@ -25,7 +25,7 @@ namespace EvolutionScraper.Service.Jobs
                 foreach (ClassBooking booking in bookings)
                 {
                     somethingFound = true;
-                    logger.LogInformation($"Time to book: {booking} scheduled for {dayOfWeek} at {booking.Time}");
+                    logger.LogInformation($"Time to book: {booking.Name} scheduled for {dayOfWeek} at {booking.Time}");
 
                     using EvolutionScraper scraper = new(options, logger);
 
