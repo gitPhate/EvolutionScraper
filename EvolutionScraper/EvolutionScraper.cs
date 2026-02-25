@@ -144,7 +144,7 @@ namespace EvolutionScraper
 
         private async ValueTask WaitUntilDueTimeAsync(short hour, short maxMinutesToWait, short secondsToWaitAfterDueTime)
         {
-            if(DateTime.Now.Hour >= hour)
+            if (DateTime.Now.Hour >= hour)
             {
                 return;
             }
@@ -186,7 +186,15 @@ namespace EvolutionScraper
                 throw new InvalidOperationException("Browser is not initialized");
             }
 
-            await LoginAsync().ConfigureAwait(false);
+            try
+            {
+                await LoginAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
+            }
+
             await FindClassesPageAsync().ConfigureAwait(false);
 
             ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
@@ -224,7 +232,7 @@ namespace EvolutionScraper
         {
             if (_page is null)
             {
-                throw new InvalidOperationException("Browser is not initialized");
+                throw ex;
             }
 
             string content = await _page.GetContentAsync().ConfigureAwait(false);
