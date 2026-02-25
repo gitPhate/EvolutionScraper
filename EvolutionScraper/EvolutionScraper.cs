@@ -100,7 +100,7 @@ namespace EvolutionScraper
             await _page.TypeAsync("#su1Password", _options.Password, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
 
             // Submit form and wait for navigation
-            await _page.ClickAsync("#btnSu1Login").ConfigureAwait(false);
+            await _page.ClickAsync("#btnSu1Login", new ClickOptions { Delay = 100 }).ConfigureAwait(false);
             await _page.WaitAsync().ConfigureAwait(false);
 
             // Verify successful login
@@ -144,6 +144,11 @@ namespace EvolutionScraper
 
         private async ValueTask WaitUntilDueTimeAsync(short hour, short maxMinutesToWait, short secondsToWaitAfterDueTime)
         {
+            if(DateTime.Now.Hour >= hour)
+            {
+                return;
+            }
+
             if (DateTime.Now.Hour != hour - 1
                 || (60 - DateTime.Now.Minute > maxMinutesToWait))
             {
@@ -188,7 +193,7 @@ namespace EvolutionScraper
 
             ClassScheduleItem? classToBook =
                 items
-                    .FirstOrDefault(x => x.ClassName.ToLowerInvariant() == className.ToLowerInvariant()
+                    .FirstOrDefault(x => x.ClassName.Equals(className, StringComparison.OrdinalIgnoreCase)
                         && x.Date == Extensions.GetNextDateTime(day, time));
 
             if (classToBook is null)

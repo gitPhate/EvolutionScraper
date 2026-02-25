@@ -9,7 +9,7 @@ namespace EvolutionScraper
         public static Task WaitAsync(this IPage page) =>
             page.WaitForNavigationAsync(new NavigationOptions
             {
-                WaitUntil = [WaitUntilNavigation.Networkidle0],
+                WaitUntil = [WaitUntilNavigation.DOMContentLoaded],
                 Timeout = 30000
             });
 
