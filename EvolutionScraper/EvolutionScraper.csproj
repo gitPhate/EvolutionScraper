@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="NLog.Extensions.Logging" Version="6.0.4" />
-    <PackageReference Include="PuppeteerSharp" Version="20.2.2" />
+    <PackageReference Include="NLog.Extensions.Logging" Version="6.1.2" />
+    <PackageReference Include="PuppeteerSharp" Version="24.40.0" />
   </ItemGroup>
 
   <ItemGroup>
