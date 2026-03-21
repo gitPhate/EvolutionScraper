@@ -127,7 +127,7 @@ namespace EvolutionScraper
 
             if (!isWeekend)
             {
-                await WaitUntilDueTimeAsync(9, 5, 60).ConfigureAwait(false);
+                await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
             }
 
             await _page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
@@ -135,7 +135,7 @@ namespace EvolutionScraper
 
             if (isWeekend)
             {
-                await WaitUntilDueTimeAsync(9, 5, 60).ConfigureAwait(false);
+                await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
 
                 await _page.ClickAsync("#day-arrow-r").ConfigureAwait(false);
                 await _page.WaitAsync().ConfigureAwait(false);
@@ -161,6 +161,7 @@ namespace EvolutionScraper
                 await Task.Delay(1000).ConfigureAwait(false);
             }
 
+            logger.LogInformation($"Waiting extra {secondsToWaitAfterDueTime} seconds after due time");
             await Task.Delay(secondsToWaitAfterDueTime * 1000).ConfigureAwait(false);
         }
 
