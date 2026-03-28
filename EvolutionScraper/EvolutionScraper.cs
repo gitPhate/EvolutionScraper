@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
 using PuppeteerSharp.Input;
+using System.Globalization;
 using System.Text.Json;
 
 namespace EvolutionScraper
@@ -114,18 +115,14 @@ namespace EvolutionScraper
             }
         }
 
-        private async Task FindClassesPageAsync()
+        private async Task FindClassesPageAsync(bool shouldGoToNextWeek)
         {
             if (_page is null)
             {
                 throw new InvalidOperationException("Browser is not initialized");
             }
 
-            bool isWeekend =
-                DateTime.Today.DayOfWeek == DayOfWeek.Saturday
-                || DateTime.Today.DayOfWeek == DayOfWeek.Sunday;
-
-            if (!isWeekend)
+            if (!shouldGoToNextWeek)
             {
                 await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
             }
@@ -133,7 +130,7 @@ namespace EvolutionScraper
             await _page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
             await _page.WaitAsync().ConfigureAwait(false);
 
-            if (isWeekend)
+            if (shouldGoToNextWeek)
             {
                 await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
 
@@ -196,7 +193,9 @@ namespace EvolutionScraper
                 await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
             }
 
-            await FindClassesPageAsync().ConfigureAwait(false);
+            bool shouldGoToNextWeek = ISOWeek.GetWeekOfYear(DateTime.Today) != ISOWeek.GetWeekOfYear(DateTime.Today.AddDays(3));
+
+            await FindClassesPageAsync(shouldGoToNextWeek).ConfigureAwait(false);
 
             ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
 
