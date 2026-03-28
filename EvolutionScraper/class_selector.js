@@ -71,7 +71,7 @@
             // Extract structured data from known positions
             const time = parentRow?.querySelector(".col-first")?.textContent.trim() || "";
             const className = parentRow?.querySelector(".modalClassDesc")?.textContent.trim() || "";
-            const instructor = parentRow?.querySelector(".modalBio")?.textContent.trim() || "";
+            const instructor = parentRow?.querySelector(".col-2 .col:nth-child(2)")?.textContent.trim() || "";
             const room = parentRow?.querySelector(".col-2 .col:nth-child(5)")?.textContent.trim() || "";
             const duration = parentRow?.querySelector(".col-2 .col:nth-child(6)")?.textContent.trim() || "";
             const availability = parentRow?.querySelector(".tablet-viewable")?.textContent.trim()
