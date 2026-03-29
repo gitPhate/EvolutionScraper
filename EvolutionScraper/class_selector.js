@@ -29,26 +29,12 @@
         // Parse the time string (format: "HH:MM TIMEZONE")
         const timeParts = timeString.trim().split(/\s+/);
         const [hours, minutes] = timeParts[0].split(':').map(num => parseInt(num));
-        const timezone = timeParts[1]; // CEST, CET, etc.
 
         // Create the date object
-        // Note: CEST is UTC+2, CET is UTC+1
-        const date = new Date(year, month, day, hours, minutes);
-
-        // Adjust for timezone if needed (this creates a local time)
-        // If you need UTC time, you might want to adjust based on timezone
-        if (timezone === 'CEST') {
-            // CEST is UTC+2 - if you want to convert to UTC, subtract 2 hours
-            // date.setHours(date.getHours() - 2);
-        } else if (timezone === 'CET') {
-            // CET is UTC+1 - if you want to convert to UTC, subtract 1 hour  
-            // date.setHours(date.getHours() - 1);
-        }
+        const date = new Date(Date.UTC(year, month, day, hours, minutes));
 
         return date;
     }
-
-
 
     const findPreviousHeader = (row) => {
         let current = row.previousElementSibling;

@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using PuppeteerSharp;
 using System.Text.Json;
-using Xunit;
 
 namespace EvolutionScraper.Tests;
 
