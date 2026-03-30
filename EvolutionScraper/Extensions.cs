@@ -1,4 +1,5 @@
 ﻿using PuppeteerSharp;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -25,15 +26,10 @@ namespace EvolutionScraper
 
     internal sealed class DateTimeConverter : JsonConverter<DateTime>
     {
-        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
-        {
-            string isoDate = reader.GetString()!;
-
-            DateTimeOffset dto = DateTimeOffset.Parse(isoDate);
-            return dto.LocalDateTime;
-        }
+        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) =>
+            DateTime.Parse(reader.GetString()!, null, DateTimeStyles.RoundtripKind);
 
         public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options) =>
-            value.ToString("o");
+            writer.WriteStringValue(value.ToString("o"));
     }
 }
