@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using PuppeteerSharp;
 using PuppeteerSharp.Input;
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 
@@ -141,7 +142,7 @@ namespace EvolutionScraper
 
         private async ValueTask WaitUntilDueTimeAsync(short hour, short maxMinutesToWait, short secondsToWaitAfterDueTime)
         {
-            if (DateTime.Now.Hour >= hour)
+            if (Debugger.IsAttached || DateTime.Now.Hour >= hour)
             {
                 return;
             }
