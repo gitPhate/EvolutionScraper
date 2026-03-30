@@ -48,7 +48,7 @@ await Host
                             ?? throw new TypeLoadException($"The job with {nameof(QuartzJobSchedule.FullTypeName)} {schedule.FullTypeName} has not been found in the assembly {assembly.FullName}");
 
                         opt
-                            .AddJob(jobType, configure: x => x.WithIdentity(schedule.FullTypeName))
+                            .AddJob(jobType, configure: (sp, x) => x.WithIdentity(schedule.FullTypeName))
                             .AddTrigger(b =>
                             {
                                 b
