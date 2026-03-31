@@ -10,6 +10,7 @@ namespace EvolutionScraper.Service.Jobs
         protected override async Task ExecuteImplAsync(IJobExecutionContext context)
         {
             bool somethingFound = false;
+            using EvolutionScraper scraper = new(options, logger);
 
             foreach (var kvp in bookings)
             {
@@ -26,7 +27,7 @@ namespace EvolutionScraper.Service.Jobs
                     somethingFound = true;
                     logger.LogInformation($"Time to book: {booking.Name} scheduled for {dayOfWeek} at {booking.Time}");
 
-                    using EvolutionScraper scraper = new(options, logger);
+                    
 
                     logger.LogInformation("Starting the booking process");
                     bool isBooked = await scraper.BookClassAsync(booking.Name, dayOfWeek, booking.Time).ConfigureAwait(false);

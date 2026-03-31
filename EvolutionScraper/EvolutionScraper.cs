@@ -14,15 +14,15 @@ namespace EvolutionScraper
         }
     }
 
-    public sealed class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable, IAsyncDisposable
+    public class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable, IAsyncDisposable
     {
         private readonly EvolutionScraperOptions _options = options;
         private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
         private IBrowser? _browser = null!;
-        private IPage? _page = null!;
+        protected IPage? _page = null!;
 
-        private async Task RunBrowserAsync()
+        protected virtual async Task RunBrowserAsync()
         {
             // Download and initialize browser
             LaunchOptions launchOptions = new()
@@ -46,14 +46,6 @@ namespace EvolutionScraper
             _page = await _browser.NewPageAsync().ConfigureAwait(false);
 
             _jsonOptions.Converters.Add(new DateTimeConverter());
-        }
-
-        private async Task LoginAsync()
-        {
-            if (_page is null)
-            {
-                throw new InvalidOperationException("Browser is not initialized");
-            }
 
             await _page.SetViewportAsync(new ViewPortOptions { Width = 1920, Height = 1080 }).ConfigureAwait(false);
 
@@ -84,10 +76,17 @@ namespace EvolutionScraper
                 ["upgrade-insecure-requests"] = "1"
             })
             .ConfigureAwait(false);
+        }
 
-            //Restore cookies
+        protected virtual async Task LoginAsync()
+        {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
 
-            string currentUrlDate = DateTime.Today.ToString("M/d/yyyy").Replace("/", "%2f");
+            string currentUrlDate = Extensions.GetURLDate();
+
             // Navigate to login page
             await _page.GoToAsync($"https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date={currentUrlDate}&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
                 new NavigationOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] })
@@ -105,6 +104,16 @@ namespace EvolutionScraper
             await _page.ClickAsync("#btnSu1Login", new ClickOptions { Delay = 100 }).ConfigureAwait(false);
             await _page.WaitAsync().ConfigureAwait(false);
 
+            await VerifySuccessulLoginAsync().ConfigureAwait(false);
+        }
+
+        private async Task VerifySuccessulLoginAsync()
+        {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
             // Verify successful login
             bool isLoggedIn = await _page.EvaluateExpressionAsync<bool>(
                 "document.querySelector('#myInfoContainer') !== null")
@@ -116,7 +125,7 @@ namespace EvolutionScraper
             }
         }
 
-        private async Task FindClassesPageAsync(bool shouldGoToNextWeek)
+        protected virtual async Task FindClassesPageAsync(bool shouldGoToNextWeek)
         {
             if (_page is null)
             {
@@ -163,7 +172,7 @@ namespace EvolutionScraper
             await Task.Delay(secondsToWaitAfterDueTime * 1000).ConfigureAwait(false);
         }
 
-        private async Task<ClassScheduleItem[]> ScrapeClassSchedulesAsync()
+        protected virtual async Task<ClassScheduleItem[]> ScrapeClassSchedulesAsync()
         {
             if (_page is null)
             {
@@ -178,20 +187,27 @@ namespace EvolutionScraper
 
         public async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
         {
-            await RunBrowserAsync().ConfigureAwait(false);
-
             if (_page is null)
             {
-                throw new InvalidOperationException("Browser is not initialized");
-            }
+                await RunBrowserAsync().ConfigureAwait(false);
 
-            try
-            {
-                await LoginAsync().ConfigureAwait(false);
+                if (_page is null)
+                {
+                    throw new InvalidOperationException("Browser is not initialized");
+                }
+
+                try
+                {
+                    await LoginAsync().ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
+                }
             }
-            catch (Exception ex)
+            else
             {
-                await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
+                await GoToMainPageAsync().ConfigureAwait(false);
             }
 
             bool shouldGoToNextWeek = ISOWeek.GetWeekOfYear(DateTime.Today) != ISOWeek.GetWeekOfYear(DateTime.Today.AddDays(3));
@@ -227,6 +243,19 @@ namespace EvolutionScraper
                 .ConfigureAwait(false);
 
             return isBooked;
+        }
+
+        protected virtual async Task GoToMainPageAsync()
+        {
+            if (_page is null)
+            {
+                throw new InvalidOperationException("Browser is not initialized");
+            }
+
+            string currentUrlDate = Extensions.GetURLDate();
+            await _page.GoToAsync($"https://clients.mindbodyonline.com/ASP/main_info.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date={currentUrlDate}&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
+                new NavigationOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] }).ConfigureAwait(false);
+            await VerifySuccessulLoginAsync().ConfigureAwait(false);
         }
 
         private async Task ThrowLoggingPageAsync(Exception ex)
