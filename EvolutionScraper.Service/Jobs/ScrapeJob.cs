@@ -16,8 +16,7 @@ namespace EvolutionScraper.Service.Jobs
                 DayOfWeek dayOfWeek = kvp.Key;
                 ClassBooking[] bookings = kvp.Value;
 
-                DayOfWeek triggerDay = (DayOfWeek)((int)(dayOfWeek - 3 + 7) % 7);
-                if (DateTime.Now.DayOfWeek != triggerDay)
+                if (!BookingHelper.IsBookingDay(dayOfWeek, DateTime.Now))
                 {
                     continue;
                 }
