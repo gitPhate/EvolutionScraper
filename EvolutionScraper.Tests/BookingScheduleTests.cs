@@ -39,7 +39,21 @@ public sealed class BookingHelperTests
     public void GetNextOccurrence_ReturnsNextFutureOccurrence()
     {
         // March 30 (Mon) → next Thursday is April 2 (crosses month boundary)
-        Assert.Equal(new DateTime(2026, 4, 2), BookingHelper.GetNextOccurrence(new DateTime(2026, 3, 30), DayOfWeek.Thursday));
+        Assert.Equal(new DateTime(2026, 4, 2), Extensions.GetNextDateTime(DayOfWeek.Thursday, new DateTime(2026, 3, 30)));
+    }
+
+    [Fact]
+    public void IsBookingDayNextWeek_ShouldReturnsTrue_WhenBookingDayIsNextWeek()
+    {
+        DateTime day = new(2026, 4, 10); // Friday, April 10, 2026
+        Assert.True(BookingHelper.IsBookingDayNextWeek(DayOfWeek.Monday, day));
+    }
+
+    [Fact]
+    public void IsBookingDayNextWeek_ShouldReturnsFalse_WhenBookingDayIsThisWeek()
+    {
+        DateTime day = new(2026, 4, 10); // Friday, April 10, 2026
+        Assert.False(BookingHelper.IsBookingDayNextWeek(DayOfWeek.Sunday, day));
     }
 }
 

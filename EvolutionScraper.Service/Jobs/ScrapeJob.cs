@@ -17,7 +17,7 @@ namespace EvolutionScraper.Service.Jobs
                 DayOfWeek dayOfWeek = kvp.Key;
                 ClassBooking[] bookings = kvp.Value;
 
-                if (!BookingHelper.IsBookingDay(dayOfWeek, DateTime.Now))
+                if (!BookingHelper.IsBookingDay(dayOfWeek, DateTime.Today))
                 {
                     continue;
                 }
@@ -26,8 +26,6 @@ namespace EvolutionScraper.Service.Jobs
                 {
                     somethingFound = true;
                     logger.LogInformation($"Time to book: {booking.Name} scheduled for {dayOfWeek} at {booking.Time}");
-
-                    
 
                     logger.LogInformation("Starting the booking process");
                     bool isBooked = await scraper.BookClassAsync(booking.Name, dayOfWeek, booking.Time).ConfigureAwait(false);

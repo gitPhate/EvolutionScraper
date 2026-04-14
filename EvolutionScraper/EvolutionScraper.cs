@@ -2,7 +2,6 @@
 using PuppeteerSharp;
 using PuppeteerSharp.Input;
 using System.Diagnostics;
-using System.Globalization;
 using System.Text.Json;
 
 namespace EvolutionScraper
@@ -210,7 +209,7 @@ namespace EvolutionScraper
                 await GoToMainPageAsync().ConfigureAwait(false);
             }
 
-            bool shouldGoToNextWeek = ISOWeek.GetWeekOfYear(DateTime.Today) != ISOWeek.GetWeekOfYear(DateTime.Today.AddDays(3));
+            bool shouldGoToNextWeek = BookingHelper.IsBookingDayNextWeek(day, DateTime.Today);
 
             await FindClassesPageAsync(shouldGoToNextWeek).ConfigureAwait(false);
 

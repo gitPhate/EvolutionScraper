@@ -14,11 +14,14 @@ namespace EvolutionScraper
                 Timeout = 30000
             });
 
-        public static DateTime GetNextDateTime(DayOfWeek targetDay, TimeOnly time)
+        public static DateTime GetNextDateTime(DayOfWeek targetDay, DateTime from) =>
+            GetNextDateTime(targetDay, new TimeOnly(0, 0), from);
+
+        public static DateTime GetNextDateTime(DayOfWeek targetDay, TimeOnly time, DateTime? from = null)
         {
-            DateTime today = DateTime.Today;
-            int daysUntilTarget = ((int)targetDay - (int)today.DayOfWeek + 7) % 7;
-            DateTime targetDate = today.AddDays(daysUntilTarget);
+            DateTime fromInternal = from ?? DateTime.Today;
+            int daysUntilTarget = ((int)targetDay - (int)fromInternal.DayOfWeek + 7) % 7;
+            DateTime targetDate = fromInternal.AddDays(daysUntilTarget);
 
             return targetDate.Add(time.ToTimeSpan());
         }
