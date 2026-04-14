@@ -144,7 +144,7 @@ namespace EvolutionScraper
             {
                 await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
 
-                await _page.ClickAsync("#day-arrow-r").ConfigureAwait(false);
+                await _page.ClickAsync("#week-arrow-r").ConfigureAwait(false);
                 await _page.WaitAsync().ConfigureAwait(false);
             }
         }
