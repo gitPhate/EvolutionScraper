@@ -24,18 +24,25 @@ namespace EvolutionScraper.Service.Jobs
 
                 foreach (ClassBooking booking in bookings)
                 {
-                    somethingFound = true;
-                    logger.LogInformation($"Time to book: {booking.Name} scheduled for {dayOfWeek} at {booking.Time}");
+                    try
+                    {
+                        somethingFound = true;
+                        logger.LogInformation($"Time to book: {booking.Name} scheduled for {dayOfWeek} at {booking.Time}");
 
-                    logger.LogInformation("Starting the booking process");
-                    bool isBooked = await scraper.BookClassAsync(booking.Name, dayOfWeek, booking.Time).ConfigureAwait(false);
-                    if (isBooked)
-                    {
-                        logger.LogInformation("Booked successfully");
+                        logger.LogInformation("Starting the booking process");
+                        bool isBooked = await scraper.BookClassAsync(booking.Name, dayOfWeek, booking.Time).ConfigureAwait(false);
+                        if (isBooked)
+                        {
+                            logger.LogInformation("Booked successfully");
+                        }
+                        else
+                        {
+                            logger.LogInformation("Something went wrong with booking");
+                        }
                     }
-                    else
+                    catch (Exception ex)
                     {
-                        logger.LogInformation("Something went wrong with booking");
+                        logger.LogError(ex, $"An error occurred in job {context.JobDetail.Key.Name.Trim()}");
                     }
                 }
             }
