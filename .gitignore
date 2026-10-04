@@ -117,3 +117,5 @@ UpgradeLog*.htm
 *.dll
 
 #Custom stuff
+# Local secrets
+.env

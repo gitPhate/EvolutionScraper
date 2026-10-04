@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace EvolutionScraper
 {
-    public record EvolutionScraperOptions(string ChromePath, string Username, string Password)
+    public record EvolutionScraperOptions(string ChromePath, string Username, string Password, bool HeadlessBrowser = true)
     {
         public EvolutionScraperOptions() : this(string.Empty, string.Empty, string.Empty)
         {
@@ -26,7 +26,7 @@ namespace EvolutionScraper
             // Download and initialize browser
             LaunchOptions launchOptions = new()
             {
-                Headless = true,
+                Headless = _options.HeadlessBrowser,
                 Args = [
                     "--disable-blink-features=AutomationControlled",
                     "--disable-dev-shm-usage",
@@ -65,16 +65,9 @@ namespace EvolutionScraper
             // Set a realistic user agent
             await _page.SetUserAgentAsync("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36").ConfigureAwait(false);
 
-            await _page.SetExtraHttpHeadersAsync(new Dictionary<string, string>
-            {
-                ["accept-language"] = "en-US,en;q=0.9",
-                ["accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                ["sec-ch-ua"] = "\"Not:A-Brand\";v=\"99\", \"Google Chrome\";v=\"145\", \"Chromium\";v=\"145\"",
-                ["sec-ch-ua-mobile"] = "?0",
-                ["sec-ch-ua-platform"] = "\"Windows\"",
-                ["upgrade-insecure-requests"] = "1"
-            })
-            .ConfigureAwait(false);
+            // Do not use SetExtraHttpHeadersAsync here: it applies to every request, including cross-origin fetch calls.
+            // Non-safelisted headers (upgrade-insecure-requests, sec-ch-ua-*) force a CORS preflight that the new
+            // mindbody pages' static-content host rejects, so the page never renders.
         }
 
         protected virtual async Task LoginAsync()
@@ -86,22 +79,26 @@ namespace EvolutionScraper
 
             string currentUrlDate = Extensions.GetURLDate();
 
-            // Navigate to login page
-            await _page.GoToAsync($"https://clients.mindbodyonline.com/ASP/su1.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date={currentUrlDate}&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
-                new NavigationOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] })
+            // Navigate to the landing page, which shows the "Accedi" button when logged out
+            await _page.GoToAsync($"https://clients.mindbodyonline.com/consumermyinfo?studioid=531524",
+                new NavigationOptions { WaitUntil = [WaitUntilNavigation.Networkidle0] })
                 .ConfigureAwait(false);
 
-            // Wait for login form to load
-            await _page.WaitForSelectorAsync("#su1UserName").ConfigureAwait(false);
-            await _page.WaitForSelectorAsync("#su1Password").ConfigureAwait(false);
+            await _page.ClickAsync(".myInfoSignInButton", new ClickOptions { Delay = 100 }).ConfigureAwait(false);
+            await _page.WaitForNavigationAsync(new NavigationOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] }).ConfigureAwait(false);
 
-            // Fill credentials
-            await _page.TypeAsync("#su1UserName", _options.Username, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
-            await _page.TypeAsync("#su1Password", _options.Password, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
+            // Email step on signin.mindbodyonline.com
+            await _page.WaitForSelectorAsync("#username").ConfigureAwait(false);
+            await _page.TypeAsync("#username", _options.Username, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
+            await _page.ClickAsync("button[type=submit]", new ClickOptions { Delay = 100 }).ConfigureAwait(false);
 
-            // Submit form and wait for navigation
-            await _page.ClickAsync("#btnSu1Login", new ClickOptions { Delay = 100 }).ConfigureAwait(false);
-            await _page.WaitAsync().ConfigureAwait(false);
+            // Password step
+            await _page.WaitForSelectorAsync("#password").ConfigureAwait(false);
+            await _page.TypeAsync("#password", _options.Password, new TypeOptions { Delay = 100 }).ConfigureAwait(false);
+            await _page.ClickAsync("button[type=submit]", new ClickOptions { Delay = 100 }).ConfigureAwait(false);
+
+            // Sign-in goes through several redirects before landing back on consumermyinfo
+            await _page.WaitForSelectorAsync("#accountFlydown", new WaitForSelectorOptions { Timeout = 60000 }).ConfigureAwait(false);
 
             await VerifySuccessulLoginAsync().ConfigureAwait(false);
         }
@@ -115,7 +112,7 @@ namespace EvolutionScraper
 
             // Verify successful login
             bool isLoggedIn = await _page.EvaluateExpressionAsync<bool>(
-                "document.querySelector('#myInfoContainer') !== null")
+                "document.querySelector('#accountFlydown') !== null")
                 .ConfigureAwait(false);
 
             if (!isLoggedIn)
@@ -136,7 +133,7 @@ namespace EvolutionScraper
                 await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
             }
 
-            await _page.ClickAsync(".tab-c-firstTab > a").ConfigureAwait(false);
+            await _page.ClickAsync("li.tabclass > .tab-c > a").ConfigureAwait(false);
             await _page.WaitAsync().ConfigureAwait(false);
 
             if (shouldGoToNextWeek)
@@ -186,62 +183,70 @@ namespace EvolutionScraper
 
         public async Task<bool> BookClassAsync(string className, DayOfWeek day, TimeOnly time)
         {
-            if (_page is null)
+            try
             {
-                await RunBrowserAsync().ConfigureAwait(false);
-
                 if (_page is null)
                 {
-                    throw new InvalidOperationException("Browser is not initialized");
+                    await RunBrowserAsync().ConfigureAwait(false);
+
+                    if (_page is null)
+                    {
+                        throw new InvalidOperationException("Browser is not initialized");
+                    }
+
+                    try
+                    {
+                        await LoginAsync().ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
+                    }
+                }
+                else
+                {
+                    await GoToMainPageAsync().ConfigureAwait(false);
                 }
 
-                try
+                bool shouldGoToNextWeek = BookingHelper.IsBookingDayNextWeek(day, DateTime.Today);
+
+                await FindClassesPageAsync(shouldGoToNextWeek).ConfigureAwait(false);
+
+                ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
+
+                ClassScheduleItem? classToBook =
+                    items
+                        .FirstOrDefault(x => x.ClassName.Equals(className, StringComparison.OrdinalIgnoreCase)
+                            && x.Date == Extensions.GetNextDateTime(day, time));
+
+                if (classToBook is null)
                 {
-                    await LoginAsync().ConfigureAwait(false);
+                    logger.LogDebug("All classes scraped:");
+                    foreach (ClassScheduleItem item in items)
+                    {
+                        logger.LogDebug(JsonSerializer.Serialize(item, _jsonOptions));
+                    }
+
+                    await ThrowLoggingPageAsync(new InvalidOperationException("Unable to find any class to book")).ConfigureAwait(false);
+                    return false;
                 }
-                catch (Exception ex)
-                {
-                    await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
-                }
+
+                await _page.ClickAsync($"input[name=\"{classToBook.Button}\"]").ConfigureAwait(false);
+                await _page.WaitAsync().ConfigureAwait(false);
+                await _page.ClickAsync($"#SubmitEnroll2").ConfigureAwait(false);
+                await _page.WaitAsync().ConfigureAwait(false);
+
+                bool isBooked = await _page.EvaluateExpressionAsync<bool>(
+                    "document.querySelector('#notifyBooking') !== null")
+                    .ConfigureAwait(false);
+
+                return isBooked;
             }
-            else
+            catch (Exception ex)
             {
-                await GoToMainPageAsync().ConfigureAwait(false);
+                await ThrowLoggingPageAsync(ex).ConfigureAwait(false);
+                throw;
             }
-
-            bool shouldGoToNextWeek = BookingHelper.IsBookingDayNextWeek(day, DateTime.Today);
-
-            await FindClassesPageAsync(shouldGoToNextWeek).ConfigureAwait(false);
-
-            ClassScheduleItem[] items = await ScrapeClassSchedulesAsync().ConfigureAwait(false);
-
-            ClassScheduleItem? classToBook =
-                items
-                    .FirstOrDefault(x => x.ClassName.Equals(className, StringComparison.OrdinalIgnoreCase)
-                        && x.Date == Extensions.GetNextDateTime(day, time));
-
-            if (classToBook is null)
-            {
-                logger.LogDebug("All classes scraped:");
-                foreach (ClassScheduleItem item in items)
-                {
-                    logger.LogDebug(JsonSerializer.Serialize(item, _jsonOptions));
-                }
-
-                await ThrowLoggingPageAsync(new InvalidOperationException("Unable to find any class to book")).ConfigureAwait(false);
-                return false;
-            }
-
-            await _page.ClickAsync($"input[name=\"{classToBook.Button}\"]").ConfigureAwait(false);
-            await _page.WaitAsync().ConfigureAwait(false);
-            await _page.ClickAsync($"#SubmitEnroll2").ConfigureAwait(false);
-            await _page.WaitAsync().ConfigureAwait(false);
-
-            bool isBooked = await _page.EvaluateExpressionAsync<bool>(
-                "document.querySelector('#notifyBooking') !== null")
-                .ConfigureAwait(false);
-
-            return isBooked;
         }
 
         protected virtual async Task GoToMainPageAsync()
