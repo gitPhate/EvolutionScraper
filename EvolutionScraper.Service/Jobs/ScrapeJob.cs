@@ -7,13 +7,15 @@ namespace EvolutionScraper.Service.Jobs
     [DisallowConcurrentExecution]
     internal class ScrapeJob(ILogger<ScrapeJob> logger, EvolutionScraperOptions options, Dictionary<DayOfWeek, ClassBooking[]> bookings) : BaseJob(logger)
     {
-        protected override async Task ExecuteImplAsync(IJobExecutionContext context)
+        protected override async Task ExecuteImplAsync(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
             bool somethingFound = false;
             using EvolutionScraper scraper = new(options, logger);
 
             foreach (var kvp in bookings)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 DayOfWeek dayOfWeek = kvp.Key;
                 ClassBooking[] bookings = kvp.Value;
 
@@ -24,6 +26,8 @@ namespace EvolutionScraper.Service.Jobs
 
                 foreach (ClassBooking booking in bookings)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     try
                     {
                         somethingFound = true;
@@ -40,7 +44,7 @@ namespace EvolutionScraper.Service.Jobs
                             logger.LogInformation("Something went wrong with booking");
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         logger.LogError(ex, $"An error occurred in job {context.JobDetail.Key.Name.Trim()}");
                     }

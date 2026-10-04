@@ -5,16 +5,16 @@ namespace EvolutionScraper.Service.Support.Quartz
 {
     internal abstract class BaseJob(ILogger logger) : IJob
     {
-        protected abstract Task ExecuteImplAsync(IJobExecutionContext context);
+        protected abstract Task ExecuteImplAsync(IJobExecutionContext context, CancellationToken cancellationToken = default);
 
-        public async Task Execute(IJobExecutionContext context)
+        public async ValueTask Execute(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
             string jobName = context.JobDetail.Key.Name.Trim();
 
             try
             {
                 logger.LogInformation($"-- Executing job {jobName} --");
-                await ExecuteImplAsync(context).ConfigureAwait(false);
+                await ExecuteImplAsync(context, cancellationToken).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -22,34 +22,7 @@ namespace EvolutionScraper.Service.Support.Quartz
             }
             finally
             {
-                await TryUnscheduleImmediateStartTriggerAsync(context).ConfigureAwait(false);
                 logger.LogInformation($"-- Ending execution of job {jobName} --");
-            }
-        }
-
-        private async Task<bool> TryUnscheduleImmediateStartTriggerAsync(IJobExecutionContext context)
-        {
-            string triggerName = string.Format(QuartzConsts.StartImmediatlyTriggerName, GetType().FullName);
-            TriggerKey triggerKey = new(triggerName);
-
-            try
-            {
-                bool triggerExists = await context.Scheduler.CheckExists(triggerKey);
-                if (!triggerExists)
-                {
-                    return true;
-                }
-
-                bool result =
-                    await context
-                        .Scheduler
-                        .UnscheduleJob(new TriggerKey(triggerName)).ConfigureAwait(false);
-
-                return result;
-            }
-            catch
-            {
-                return false;
             }
         }
     }

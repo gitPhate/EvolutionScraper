@@ -60,7 +60,7 @@ await Host
                                     case JobScheduleType.Simple:
                                         b
                                             .WithSimpleSchedule(x =>
-                                                x.WithIntervalInSeconds(schedule.SimpleValueInSeconds ?? 0)
+                                                x.WithInterval(TimeSpan.FromSeconds(schedule.SimpleValueInSeconds ?? 0))
                                                 .RepeatForever()
                                             );
                                         break;
@@ -73,22 +73,20 @@ await Host
                                 {
                                     b.StartAt(DateTimeOffset.UtcNow.AddSeconds(schedule.StartAfterInSeconds.Value));
                                 }
-                                else if (schedule.StartImmediatly ?? false)
-                                {
-                                    opt.AddTrigger(bb =>
-                                    {
-                                        bb
-                                        .WithIdentity(string.Format(QuartzConsts.StartImmediatlyTriggerName, schedule.FullTypeName))
-                                        .ForJob(schedule.FullTypeName)
-                                        .WithSimpleSchedule(x => x.WithRepeatCount(0))
-                                        .StartNow();
-                                    });
-                                }
                                 else
                                 {
                                     b.StartNow();
                                 }
                             });
+
+                        if (!schedule.StartAfterInSeconds.HasValue && (schedule.StartImmediatly ?? false))
+                        {
+                            opt.AddTrigger(b => b
+                                .WithIdentity($"{schedule.FullTypeName}-immediate")
+                                .ForJob(schedule.FullTypeName)
+                                .WithSimpleSchedule(x => x.WithRepeatCount(0))
+                                .StartNow());
+                        }
                     }
                 })
                 .AddQuartzHostedService(options =>
