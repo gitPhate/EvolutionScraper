@@ -15,11 +15,15 @@ namespace EvolutionScraper
 
     public class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable, IAsyncDisposable
     {
+        const string MainPageUrl = "https://clients.mindbodyonline.com/consumermyinfo?studioid=531524";
+
         private readonly EvolutionScraperOptions _options = options;
         private readonly JsonSerializerOptions _jsonOptions = new(JsonSerializerDefaults.Web);
 
         private IBrowser? _browser = null!;
         protected IPage? _page = null!;
+
+        private bool _isOnNextWeek = false;
 
         protected virtual async Task RunBrowserAsync()
         {
@@ -77,10 +81,8 @@ namespace EvolutionScraper
                 throw new InvalidOperationException("Browser is not initialized");
             }
 
-            string currentUrlDate = Extensions.GetURLDate();
-
             // Navigate to the landing page, which shows the "Accedi" button when logged out
-            await _page.GoToAsync($"https://clients.mindbodyonline.com/consumermyinfo?studioid=531524",
+            await _page.GoToAsync(MainPageUrl,
                 new NavigationOptions { WaitUntil = [WaitUntilNavigation.Networkidle0] })
                 .ConfigureAwait(false);
 
@@ -136,12 +138,17 @@ namespace EvolutionScraper
             await _page.ClickAsync("li.tabclass > .tab-c > a").ConfigureAwait(false);
             await _page.WaitAsync().ConfigureAwait(false);
 
-            if (shouldGoToNextWeek)
+            // The calendar remembers the last displayed week, so align it with the wanted one.
+            if (shouldGoToNextWeek != _isOnNextWeek)
             {
-                await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
+                if (shouldGoToNextWeek)
+                {
+                    await WaitUntilDueTimeAsync(9, 5, 120).ConfigureAwait(false);
+                }
 
-                await _page.ClickAsync("#week-arrow-r").ConfigureAwait(false);
+                await _page.ClickAsync(shouldGoToNextWeek ? "#week-arrow-r" : "#week-arrow-l").ConfigureAwait(false);
                 await _page.WaitAsync().ConfigureAwait(false);
+                _isOnNextWeek = shouldGoToNextWeek;
             }
         }
 
@@ -256,8 +263,7 @@ namespace EvolutionScraper
                 throw new InvalidOperationException("Browser is not initialized");
             }
 
-            string currentUrlDate = Extensions.GetURLDate();
-            await _page.GoToAsync($"https://clients.mindbodyonline.com/ASP/main_info.asp?studioid=531524&tg=&vt=&lvl=&stype=&view=&trn=0&page=&catid=&prodid=&date={currentUrlDate}&classid=0&prodGroupId=&sSU=&optForwardingLink=&qParam=&justloggedin=&nLgIn=&pMode=0&loc=1",
+            await _page.GoToAsync(MainPageUrl,
                 new NavigationOptions { WaitUntil = [WaitUntilNavigation.DOMContentLoaded] }).ConfigureAwait(false);
             await VerifySuccessulLoginAsync().ConfigureAwait(false);
         }

@@ -25,8 +25,6 @@ namespace EvolutionScraper
 
             return targetDate.Add(time.ToTimeSpan());
         }
-
-        public static string GetURLDate() => DateTime.Today.ToString("M/d/yyyy").Replace("/", "%2f");
     }
 
     internal sealed class DateTimeConverter : JsonConverter<DateTime>
