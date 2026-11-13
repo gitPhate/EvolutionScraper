@@ -62,27 +62,6 @@ public sealed class BookingDayCalendarTests
     }
 }
 
-public sealed class BookingRetryTests
-{
-    [Theory]
-    [InlineData(0, 3, true)]
-    [InlineData(2, 3, true)]
-    [InlineData(3, 3, false)]
-    [InlineData(0, 0, false)]
-    public void CanRetry_ShouldStopAfterMaxRetries(int retriesDone, int maxRetries, bool expected)
-    {
-        Assert.Equal(expected, BookingRetry.CanRetry(retriesDone, maxRetries));
-    }
-
-    [Fact]
-    public void GetRetryTriggerName_ShouldBeUniquePerRetry()
-    {
-        Assert.NotEqual(
-            BookingRetry.GetRetryTriggerName("Calisthenics-Wednesday", 1),
-            BookingRetry.GetRetryTriggerName("Calisthenics-Wednesday", 2));
-    }
-}
-
 public sealed class BookingJobDataTests
 {
     [Fact]

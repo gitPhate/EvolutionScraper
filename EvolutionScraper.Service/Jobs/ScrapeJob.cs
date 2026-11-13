@@ -5,16 +5,11 @@ using Quartz;
 namespace EvolutionScraper.Service.Jobs
 {
     [DisallowConcurrentExecution]
-    internal class ScrapeJob(ILogger<ScrapeJob> logger, EvolutionScraperOptions options, QuartzConfig quartzConfig) : BaseJob(logger)
+    internal class ScrapeJob(ILogger<ScrapeJob> logger, EvolutionScraperOptions options) : BaseJob(logger)
     {
         protected override async Task ExecuteImplAsync(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-
-            JobKey jobKey = context.JobDetail.Key;
-            int retriesDone = context.MergedJobDataMap.ContainsKey(BookingRetry.AttemptKey)
-                ? context.MergedJobDataMap.GetInt(BookingRetry.AttemptKey)
-                : 0;
 
             Dictionary<string, string> data = context.MergedJobDataMap
                 .Where(x => x.Value is string)
@@ -22,54 +17,31 @@ namespace EvolutionScraper.Service.Jobs
 
             BookingJobData booking = BookingJobData.Parse(data);
 
-            bool isBooked = false;
+            // Quartz re-fires the trigger when the job throws, according to the retry policy set in Program.cs
+            int maxAttempts = (context.RetryPolicy?.MaxAttempts ?? 0) + 1;
+            bool isLastAttempt = context.RetryAttempt + 1 >= maxAttempts;
 
             try
             {
-                using EvolutionScraper scraper = new(options, logger, jobKey.Name);
+                using EvolutionScraper scraper = new(options, logger, context.JobDetail.Key.Name);
 
-                logger.LogInformation($"Time to book: {booking.ClassName} scheduled for {booking.DayOfWeek} at {booking.Time} (attempt {retriesDone + 1})");
+                logger.LogInformation($"Time to book: {booking.ClassName} scheduled for {booking.DayOfWeek} at {booking.Time} (attempt {context.RetryAttempt + 1}/{maxAttempts})");
                 logger.LogInformation("Starting the booking process");
-                isBooked = await scraper.BookClassAsync(booking.ClassName, booking.DayOfWeek, booking.Time).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                logger.LogError(ex, $"An error occurred in job {jobKey.Name.Trim()}");
-            }
 
-            if (isBooked)
-            {
+                bool isBooked = await scraper.BookClassAsync(booking.ClassName, booking.DayOfWeek, booking.Time).ConfigureAwait(false);
+
+                if (!isBooked)
+                {
+                    throw new InvalidOperationException("Something went wrong with booking: the booking was not confirmed");
+                }
+
                 logger.LogInformation("Booked successfully");
-                return;
             }
-
-            logger.LogWarning("Something went wrong with booking");
-            await ScheduleRetryAsync(context, retriesDone, cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task ScheduleRetryAsync(IJobExecutionContext context, int retriesDone, CancellationToken cancellationToken)
-        {
-            JobKey jobKey = context.JobDetail.Key;
-
-            if (!BookingRetry.CanRetry(retriesDone, quartzConfig.MaxRetries))
+            catch (Exception) when (isLastAttempt)
             {
-                logger.LogError($"Booking failed after {retriesDone + 1} attempts, giving up");
-                return;
+                logger.LogError($"Booking of {booking.ClassName} failed on the last attempt, giving up");
+                throw;
             }
-
-            int nextRetry = retriesDone + 1;
-
-            // The retry trigger is not bound to the booking-day calendar: it must fire regardless of the day rules
-            ITrigger trigger = TriggerBuilder
-                .Create()
-                .WithIdentity(BookingRetry.GetRetryTriggerName(jobKey.Name, nextRetry), jobKey.Group)
-                .ForJob(jobKey)
-                .UsingJobData(BookingRetry.AttemptKey, nextRetry)
-                .StartAt(DateTimeOffset.UtcNow.AddSeconds(quartzConfig.RetryDelayInSeconds))
-                .Build();
-
-            await context.Scheduler.ScheduleJob(trigger, default, cancellationToken).ConfigureAwait(false);
-            logger.LogInformation($"Retry {nextRetry}/{quartzConfig.MaxRetries} scheduled in {quartzConfig.RetryDelayInSeconds} seconds");
         }
     }
 }

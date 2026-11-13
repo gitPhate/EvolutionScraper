@@ -187,7 +187,7 @@ Use **xUnit** as the preferred test framework if tests are added; follow the `Na
 
 - Application settings live in `EvolutionScraper.Service/appsettings.json`.
 - **Do not commit real credentials.** Use .NET User Secrets (`dotnet user-secrets`) for local development and a secure vault for production.
-- Each booking is one `ScrapeJob` instance in `QuartzConfig:Jobs` (`Name` is its Quartz identity, `Data` goes into the `JobDataMap`). The trigger is a fixed daily cron at 08:59 in `Program.cs`, filtered by `BookingDayCalendar` (wraps `BookingHelper.IsBookingDay`). Failed bookings are retried with one-shot triggers (`MaxRetries`, `RetryDelayInSeconds`).
+- Each booking is one `ScrapeJob` instance in `QuartzConfig:Jobs` (`Name` is its Quartz identity, `Data` goes into the `JobDataMap`). The trigger is a fixed daily cron at 08:59 in `Program.cs`, filtered by `BookingDayCalendar` (wraps `BookingHelper.IsBookingDay`). Failed bookings (any exception, or an unconfirmed booking) are retried with Quartz's built-in retry policy, `RetryPolicy.Fixed(MaxRetries, RetryDelayInSeconds)`, set in `Program.cs`; `BaseJob` rethrows so Quartz sees the failure.
 
 ---
 

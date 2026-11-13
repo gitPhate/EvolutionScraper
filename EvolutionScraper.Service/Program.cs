@@ -23,7 +23,6 @@ await Host
         {
             services
                 .AddSingletonOption<EvolutionScraperOptions>()
-                .AddSingletonOption<QuartzConfig>()
                 .AddQuartz
                 (opt =>
                 {
@@ -35,6 +34,12 @@ await Host
                     {
                         tp.MaxConcurrency = 10;
                     });
+
+                    // A job that throws is re-fired by Quartz: MaxRetries retries after the first failure, RetryDelayInSeconds apart
+                    if (quartzConfig.MaxRetries > 0)
+                    {
+                        opt.UseDefaultRetryPolicy(RetryPolicy.Fixed(quartzConfig.MaxRetries, TimeSpan.FromSeconds(quartzConfig.RetryDelayInSeconds)));
+                    }
 
                     Assembly assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
 
