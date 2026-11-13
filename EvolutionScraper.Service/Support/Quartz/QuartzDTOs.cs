@@ -1,16 +1,22 @@
-﻿namespace EvolutionScraper.Service.Support.Quartz
+namespace EvolutionScraper.Service.Support.Quartz
 {
-    public enum JobScheduleType { Simple, Cron }
-
-    public record QuartzJobSchedule(string FullTypeName, bool IsActive, JobScheduleType ScheduleType, string? CronValue, int? SimpleValueInSeconds, int? StartAfterInSeconds, bool? StartImmediatly)
+    public record QuartzJobSchedule(
+        string Name,
+        string FullTypeName,
+        bool IsActive,
+        int? StartAfterInSeconds,
+        bool? StartImmediately,
+        string? Calendar,
+        Dictionary<string, string> Data)
     {
-        public QuartzJobSchedule() : this(string.Empty, false, JobScheduleType.Simple, null, null, null, null)
+        public QuartzJobSchedule() : this(string.Empty, string.Empty, false, null, null, null, [])
         {
         }
     }
-    public record QuartzConfig(int JobRescheduleIntervalInSeconds, QuartzJobSchedule[] Jobs)
+
+    public record QuartzConfig(int JobRescheduleIntervalInSeconds, int RetryDelayInSeconds, int MaxRetries, QuartzJobSchedule[] Jobs)
     {
-        public QuartzConfig() : this(0, [])
+        public QuartzConfig() : this(0, 60, 3, [])
         {
         }
     }

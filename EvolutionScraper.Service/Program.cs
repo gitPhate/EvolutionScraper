@@ -1,7 +1,7 @@
 ﻿using EvolutionScraper;
+using EvolutionScraper.Service.Support;
 using EvolutionScraper.Service.Support.DI;
 using EvolutionScraper.Service.Support.Quartz;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NLog.Extensions.Hosting;
@@ -9,6 +9,9 @@ using Quartz;
 using System.Reflection;
 
 Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+
+// Booking opens at 09:05: the scraper logs in and then waits for it, so it must start between 08:55 and 09:00
+const string BookingCron = "0 59 8 * * ?";
 
 await Host
     .CreateDefaultBuilder(args)
@@ -20,8 +23,6 @@ await Host
         {
             services
                 .AddSingletonOption<EvolutionScraperOptions>()
-                .AddSingletonOption<Dictionary<DayOfWeek, ClassBooking[]>>("Bookings")
-                .Configure<QuartzConfig>(hostContext.Configuration.GetSection($"{nameof(QuartzConfig)}"))
                 .AddQuartz
                 (opt =>
                 {
@@ -34,6 +35,12 @@ await Host
                         tp.MaxConcurrency = 10;
                     });
 
+                    // A job that throws is re-fired by Quartz: MaxRetries retries after the first failure, RetryDelayInSeconds apart
+                    if (quartzConfig.MaxRetries > 0)
+                    {
+                        opt.UseDefaultRetryPolicy(RetryPolicy.Fixed(quartzConfig.MaxRetries, TimeSpan.FromSeconds(quartzConfig.RetryDelayInSeconds)));
+                    }
+
                     Assembly assembly = Assembly.GetEntryAssembly() ?? Assembly.GetExecutingAssembly();
 
                     foreach (QuartzJobSchedule schedule in quartzConfig.Jobs)
@@ -43,30 +50,49 @@ await Host
                             continue;
                         }
 
+                        if (schedule.Name.IsNullOrBlankString())
+                        {
+                            throw new InvalidOperationException($"A job of type {schedule.FullTypeName} has no {nameof(QuartzJobSchedule.Name)}");
+                        }
+
                         Type? jobType =
                             assembly.GetType(schedule.FullTypeName, false)
                             ?? throw new TypeLoadException($"The job with {nameof(QuartzJobSchedule.FullTypeName)} {schedule.FullTypeName} has not been found in the assembly {assembly.FullName}");
 
+                        string? calendarName = null;
+
+                        if (!schedule.Calendar.IsNullOrBlankString())
+                        {
+                            if (schedule.Calendar != BookingDayCalendar.Name)
+                            {
+                                throw new NotSupportedException($"Unknown calendar '{schedule.Calendar}' for job {schedule.Name}");
+                            }
+
+                            DayOfWeek bookedDay = BookingJobData.Parse(schedule.Data).DayOfWeek;
+                            calendarName = $"{schedule.Name}-{BookingDayCalendar.Name}";
+                            opt.AddCalendar<BookingDayCalendar>(calendarName, AddCalendarOptions.Replacing, c => c.BookedDay = bookedDay);
+                        }
+
                         opt
-                            .AddJob(jobType, configure: (sp, x) => x.WithIdentity(schedule.FullTypeName))
+                            .AddJob(jobType, configure: (sp, x) =>
+                            {
+                                x.WithIdentity(schedule.Name);
+
+                                foreach (KeyValuePair<string, string> item in schedule.Data)
+                                {
+                                    x.UsingJobData(item.Key, item.Value);
+                                }
+                            })
                             .AddTrigger(b =>
                             {
                                 b
-                                    .WithIdentity(schedule.FullTypeName)
-                                    .ForJob(schedule.FullTypeName);
+                                    .WithIdentity(schedule.Name)
+                                    .ForJob(schedule.Name)
+                                    .WithCronSchedule(BookingCron);
 
-                                switch (schedule.ScheduleType)
+                                if (calendarName is not null)
                                 {
-                                    case JobScheduleType.Simple:
-                                        b
-                                            .WithSimpleSchedule(x =>
-                                                x.WithInterval(TimeSpan.FromSeconds(schedule.SimpleValueInSeconds ?? 0))
-                                                .RepeatForever()
-                                            );
-                                        break;
-                                    case JobScheduleType.Cron:
-                                        b.WithCronSchedule(schedule.CronValue ?? string.Empty);
-                                        break;
+                                    b.WithCalendarName(calendarName);
                                 }
 
                                 if (schedule.StartAfterInSeconds.HasValue)
@@ -79,11 +105,12 @@ await Host
                                 }
                             });
 
-                        if (!schedule.StartAfterInSeconds.HasValue && (schedule.StartImmediatly ?? false))
+                        // Testing only: fires once at startup, without the calendar, so it books regardless of the day rules
+                        if (!schedule.StartAfterInSeconds.HasValue && (schedule.StartImmediately ?? false))
                         {
                             opt.AddTrigger(b => b
-                                .WithIdentity($"{schedule.FullTypeName}-immediate")
-                                .ForJob(schedule.FullTypeName)
+                                .WithIdentity($"{schedule.Name}-immediate")
+                                .ForJob(schedule.Name)
                                 .WithSimpleSchedule(x => x.WithRepeatCount(0))
                                 .StartNow());
                         }

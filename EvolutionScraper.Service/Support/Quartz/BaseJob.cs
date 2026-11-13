@@ -19,6 +19,9 @@ namespace EvolutionScraper.Service.Support.Quartz
             catch (Exception ex)
             {
                 logger.LogError(ex, $"An error occurred in job {jobName}");
+
+                // Rethrown so Quartz sees the failure and applies the retry policy
+                throw;
             }
             finally
             {

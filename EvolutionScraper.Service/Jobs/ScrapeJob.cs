@@ -5,55 +5,42 @@ using Quartz;
 namespace EvolutionScraper.Service.Jobs
 {
     [DisallowConcurrentExecution]
-    internal class ScrapeJob(ILogger<ScrapeJob> logger, EvolutionScraperOptions options, Dictionary<DayOfWeek, ClassBooking[]> bookings) : BaseJob(logger)
+    internal class ScrapeJob(ILogger<ScrapeJob> logger, EvolutionScraperOptions options) : BaseJob(logger)
     {
         protected override async Task ExecuteImplAsync(IJobExecutionContext context, CancellationToken cancellationToken = default)
         {
-            bool somethingFound = false;
-            using EvolutionScraper scraper = new(options, logger);
+            cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var kvp in bookings)
+            Dictionary<string, string> data = context.MergedJobDataMap
+                .Where(x => x.Value is string)
+                .ToDictionary(x => x.Key, x => (string)x.Value!);
+
+            BookingJobData booking = BookingJobData.Parse(data);
+
+            // Quartz re-fires the trigger when the job throws, according to the retry policy set in Program.cs
+            int maxAttempts = (context.RetryPolicy?.MaxAttempts ?? 0) + 1;
+            bool isLastAttempt = context.RetryAttempt + 1 >= maxAttempts;
+
+            try
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                using EvolutionScraper scraper = new(options, logger, context.JobDetail.Key.Name);
 
-                DayOfWeek dayOfWeek = kvp.Key;
-                ClassBooking[] bookings = kvp.Value;
+                logger.LogInformation($"Time to book: {booking.ClassName} scheduled for {booking.DayOfWeek} at {booking.Time} (attempt {context.RetryAttempt + 1}/{maxAttempts})");
+                logger.LogInformation("Starting the booking process");
 
-                if (!BookingHelper.IsBookingDay(dayOfWeek, DateTime.Today))
+                bool isBooked = await scraper.BookClassAsync(booking.ClassName, booking.DayOfWeek, booking.Time).ConfigureAwait(false);
+
+                if (!isBooked)
                 {
-                    continue;
+                    throw new InvalidOperationException("Something went wrong with booking: the booking was not confirmed");
                 }
 
-                foreach (ClassBooking booking in bookings)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-
-                    try
-                    {
-                        somethingFound = true;
-                        logger.LogInformation($"Time to book: {booking.Name} scheduled for {dayOfWeek} at {booking.Time}");
-
-                        logger.LogInformation("Starting the booking process");
-                        bool isBooked = await scraper.BookClassAsync(booking.Name, dayOfWeek, booking.Time).ConfigureAwait(false);
-                        if (isBooked)
-                        {
-                            logger.LogInformation("Booked successfully");
-                        }
-                        else
-                        {
-                            logger.LogInformation("Something went wrong with booking");
-                        }
-                    }
-                    catch (Exception ex) when (ex is not OperationCanceledException)
-                    {
-                        logger.LogError(ex, $"An error occurred in job {context.JobDetail.Key.Name.Trim()}");
-                    }
-                }
+                logger.LogInformation("Booked successfully");
             }
-
-            if (!somethingFound)
+            catch (Exception) when (isLastAttempt)
             {
-                logger.LogInformation("Nothing to book found");
+                logger.LogError($"Booking of {booking.ClassName} failed on the last attempt, giving up");
+                throw;
             }
         }
     }

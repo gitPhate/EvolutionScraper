@@ -19,12 +19,22 @@ EvolutionScraper handles the tedious work of securing your spot in popular class
 1. **Configure** your classes in `appsettings.json`:
    ```json
    {
-     "Bookings": {
-       "Wednesday": [{ "Name": "Calisthenics", "Time": "20:00:00" }],
-       "Friday": [{ "Name": "Calisthenics", "Time": "20:00:00" }]
+     "QuartzConfig": {
+       "RetryDelayInSeconds": 60,
+       "MaxRetries": 3,
+       "Jobs": [
+         {
+           "Name": "Calisthenics-Wednesday",
+           "FullTypeName": "EvolutionScraper.Service.Jobs.ScrapeJob",
+           "IsActive": true,
+           "Calendar": "BookingDay",
+           "Data": { "ClassName": "Calisthenics", "DayOfWeek": "Wednesday", "Time": "20:00:00" }
+         }
+       ]
      }
    }
    ```
+   Each job is one booking. It starts every day at 08:59, but the `BookingDay` calendar lets it fire only on the day booking opens (3 days before the class, or the 1st of the month when that day falls in the previous month). If a booking fails it is retried `MaxRetries` times, `RetryDelayInSeconds` apart.
 
 2. **Install** the Windows service and start it
 
@@ -39,8 +49,9 @@ All settings live in `appsettings.json`:
 | `EvolutionScraperOptions:ChromePath` | Path to Chrome browser |
 | `EvolutionScraperOptions:Username` | Your Evolution gym email |
 | `EvolutionScraperOptions:Password` | Your Evolution gym password |
-| `Bookings` | Weekly schedule of classes to book |
-| `QuartzConfig` | How often to check and run bookings |
+| `QuartzConfig:Jobs` | One entry per class to book (`Name`, `Calendar`, `Data`, optional `StartAfterInSeconds`) |
+| `QuartzConfig:Jobs:StartImmediately` | Testing only: fires once at startup and books regardless of the day rules |
+| `QuartzConfig:RetryDelayInSeconds` / `MaxRetries` | Delay and number of retries after a failed booking |
 
 ---
 

@@ -176,7 +176,7 @@ Use **xUnit** as the preferred test framework if tests are added; follow the `Na
 - Register options via the custom `AddSingletonOption<T>` extension in `OptionsDIExtensions.cs`:
   ```csharp
   services.AddSingletonOption<EvolutionScraperOptions>()
-          .AddSingletonOption<Dictionary<DayOfWeek, ClassBooking[]>>("Bookings")
+          .AddSingletonOption<QuartzConfig>()
   ```
 - All DI registrations live in `Program.cs` — do not scatter registrations across the codebase.
 - Prefer constructor injection (via primary constructors); avoid service locator patterns.
@@ -187,7 +187,7 @@ Use **xUnit** as the preferred test framework if tests are added; follow the `Na
 
 - Application settings live in `EvolutionScraper.Service/appsettings.json`.
 - **Do not commit real credentials.** Use .NET User Secrets (`dotnet user-secrets`) for local development and a secure vault for production.
-- Quartz job schedules are configured in `appsettings.json` under `QuartzConfig`; supports both simple interval and cron expression triggers.
+- Each booking is one `ScrapeJob` instance in `QuartzConfig:Jobs` (`Name` is its Quartz identity, `Data` goes into the `JobDataMap`). The trigger is a fixed daily cron at 08:59 in `Program.cs`, filtered by `BookingDayCalendar` (wraps `BookingHelper.IsBookingDay`). Failed bookings (any exception, or an unconfirmed booking) are retried with Quartz's built-in retry policy, `RetryPolicy.Fixed(MaxRetries, RetryDelayInSeconds)`, set in `Program.cs`; `BaseJob` rethrows so Quartz sees the failure.
 
 ---
 

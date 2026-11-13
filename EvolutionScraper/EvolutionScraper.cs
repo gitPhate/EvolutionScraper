@@ -13,7 +13,7 @@ namespace EvolutionScraper
         }
     }
 
-    public class EvolutionScraper(EvolutionScraperOptions options, ILogger logger) : IDisposable, IAsyncDisposable
+    public class EvolutionScraper(EvolutionScraperOptions options, ILogger logger, string? instanceName = null) : IDisposable, IAsyncDisposable
     {
         const string MainPageUrl = "https://clients.mindbodyonline.com/consumermyinfo?studioid=531524";
 
@@ -276,7 +276,11 @@ namespace EvolutionScraper
             }
 
             string content = await _page.GetContentAsync().ConfigureAwait(false);
-            await File.WriteAllTextAsync($"page_dump_{DateTime.Now:yyyyMMddHHmmss}.html", content).ConfigureAwait(false);
+            // The instance name keeps dumps of parallel bookings failing in the same second from overwriting each other
+            string suffix = string.IsNullOrWhiteSpace(instanceName)
+                ? string.Empty
+                : $"_{string.Concat(instanceName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c))}";
+            await File.WriteAllTextAsync($"page_dump_{DateTime.Now:yyyyMMddHHmmss}{suffix}.html", content).ConfigureAwait(false);
             throw ex;
         }
 
